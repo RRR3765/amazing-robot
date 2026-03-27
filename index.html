@@ -1,18 +1,28 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Barcode Cart System</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Barcode Cart</title>
+
   <link rel="stylesheet" href="style.css">
   <script src="https://unpkg.com/html5-qrcode"></script>
 </head>
 
 <body>
-  <h1>Barcode Scanner Cart</h1>
 
-  <div id="reader"></div>
+  <div class="app">
+    <header>
+      <h1>📦 Smart Cart</h1>
+      <p>Scan a barcode to add items</p>
+    </header>
 
-  <h2>Cart</h2>
-  <ul id="cart"></ul>
+    <div id="reader"></div>
+
+    <section class="cart">
+      <h2>Your Cart</h2>
+      <ul id="cart"></ul>
+    </section>
+  </div>
 
   <script src="script.js"></script>
 </body>
