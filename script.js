@@ -1,9 +1,9 @@
 let cart = JSON.parse(localStorage.getItem("cart")) || {};
-
-// render cart on load
 renderCart();
 
-// start camera
+let lastScan = null;
+let scanCooldown = false;
+
 Html5Qrcode.getCameras().then(devices => {
 
   if (!devices || devices.length === 0) {
@@ -11,7 +11,7 @@ Html5Qrcode.getCameras().then(devices => {
     return;
   }
 
-  // try to find back camera
+  // pick back camera if possible
   let backCamera = devices.find(d =>
     d.label.toLowerCase().includes("back") ||
     d.label.toLowerCase().includes("rear")
@@ -24,23 +24,25 @@ Html5Qrcode.getCameras().then(devices => {
   scanner.start(
     cameraId,
     {
-      fps: 10,
-      qrbox: 250
+      fps: 15,              // smoother scanning
+      qrbox: { width: 250, height: 250 }
     },
     onScanSuccess
   );
 
 }).catch(err => {
   console.error(err);
-  alert("Camera permission denied or not supported");
+  alert("Camera permission blocked or not supported");
 });
 
-let scanning = true;
-
 function onScanSuccess(decodedText) {
-  if (!scanning) return;
 
-  scanning = false;
+  // prevent double scanning spam
+  if (scanCooldown) return;
+  if (decodedText === lastScan) return;
+
+  lastScan = decodedText;
+  scanCooldown = true;
 
   let barcode = decodedText;
 
@@ -51,7 +53,7 @@ function onScanSuccess(decodedText) {
     let price = prompt("Price:");
 
     if (!name || !price) {
-      scanning = true;
+      scanCooldown = false;
       return;
     }
 
@@ -62,9 +64,9 @@ function onScanSuccess(decodedText) {
 
   addToCart(product);
 
-  // small delay so it doesn't double-scan
+  // cooldown so it feels like real scanner (important)
   setTimeout(() => {
-    scanning = true;
+    scanCooldown = false;
   }, 1200);
 }
 
