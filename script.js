@@ -1,11 +1,11 @@
 let cart = JSON.parse(localStorage.getItem("cart")) || {};
 renderCart();
 
+let scanner;
 let lastScan = "";
 let lastScanTime = 0;
 
-let scanner;
-
+// 🚀 Start camera
 Html5Qrcode.getCameras().then(devices => {
 
   if (!devices || devices.length === 0) {
@@ -13,6 +13,7 @@ Html5Qrcode.getCameras().then(devices => {
     return;
   }
 
+  // 🎯 try to pick back camera
   let backCamera = devices.find(d =>
     d.label.toLowerCase().includes("back") ||
     d.label.toLowerCase().includes("rear")
@@ -31,13 +32,17 @@ Html5Qrcode.getCameras().then(devices => {
     onScanSuccess
   );
 
+}).catch(err => {
+  console.error(err);
+  alert("Camera permission denied or not supported");
 });
 
+// 📷 MAIN SCAN FUNCTION
 async function onScanSuccess(decodedText) {
 
   let now = Date.now();
 
-  // 🚫 BLOCK DUPLICATES (same barcode within 2 seconds)
+  // 🚫 prevent duplicate scans (same barcode spam)
   if (decodedText === lastScan && now - lastScanTime < 2000) {
     return;
   }
@@ -45,51 +50,72 @@ async function onScanSuccess(decodedText) {
   lastScan = decodedText;
   lastScanTime = now;
 
-  // ⏸ PAUSE SCANNING (prevents spam + freezing)
+  let barcode = decodedText;
+
+  // 🧠 CHECK IF PRODUCT ALREADY EXISTS
+  let savedProduct = JSON.parse(localStorage.getItem("product_" + barcode));
+
+  if (savedProduct) {
+    // ✅ already known → just add to cart
+    addToCart(savedProduct);
+    return;
+  }
+
+  // ⏸ pause scanner while user inputs data (prevents freezing/bugs)
   try {
     await scanner.pause(true);
   } catch (e) {
-    console.log("pause error ignored");
+    console.log("pause ignored");
   }
 
-  let barcode = decodedText;
+  // ❌ NEW PRODUCT → ask once
+  let name = prompt("New product name:");
+  let price = prompt("Price:");
 
-  let product = JSON.parse(localStorage.getItem(barcode));
-
-  if (!product) {
-    let name = prompt("New product name:");
-    let price = prompt("Price:");
-
-    if (!name || !price) {
-      resumeScanner();
-      return;
-    }
-
-    product = { name, price };
-    localStorage.setItem(barcode, JSON.stringify(product));
+  if (!name || !price) {
+    resumeScanner();
+    return;
   }
 
+  let product = {
+    barcode,
+    name,
+    price
+  };
+
+  // 💾 SAVE FOR FUTURE SCANS (THIS IS THE MEMORY SYSTEM)
+  localStorage.setItem("product_" + barcode, JSON.stringify(product));
+
+  // 🛒 ADD TO CART
   addToCart(product);
 
-  // ⏱ resume after short delay (smooth scanning)
+  // ⏱ resume scanner after short delay
   setTimeout(() => {
     resumeScanner();
-  }, 1200);
+  }, 1000);
 }
 
+// ▶️ resume scanner safely
 async function resumeScanner() {
   try {
     await scanner.resume();
   } catch (e) {
-    console.log("resume error ignored");
+    console.log("resume ignored");
   }
 }
 
+// 🛒 ADD TO CART
 function addToCart(product) {
-  let key = product.name;
+
+  let key = product.barcode;
 
   if (!cart[key]) {
-    cart[key] = { ...product, qty: 1 };
+    cart[key] = {
+      name: product.name,
+      price: product.price,
+      barcode: product.barcode,
+      qty: 1
+    };
   } else {
     cart[key].qty++;
   }
@@ -98,6 +124,7 @@ function addToCart(product) {
   renderCart();
 }
 
+// 📦 RENDER CART UI
 function renderCart() {
   let list = document.getElementById("cart");
   list.innerHTML = "";
