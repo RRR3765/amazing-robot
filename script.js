@@ -1,8 +1,10 @@
 let cart = JSON.parse(localStorage.getItem("cart")) || {};
 renderCart();
 
-let lastScan = null;
-let scanCooldown = false;
+let lastScan = "";
+let lastScanTime = 0;
+
+let scanner;
 
 Html5Qrcode.getCameras().then(devices => {
 
@@ -11,7 +13,6 @@ Html5Qrcode.getCameras().then(devices => {
     return;
   }
 
-  // pick back camera if possible
   let backCamera = devices.find(d =>
     d.label.toLowerCase().includes("back") ||
     d.label.toLowerCase().includes("rear")
@@ -19,30 +20,37 @@ Html5Qrcode.getCameras().then(devices => {
 
   let cameraId = backCamera ? backCamera.id : devices[0].id;
 
-  const scanner = new Html5Qrcode("reader");
+  scanner = new Html5Qrcode("reader");
 
   scanner.start(
     cameraId,
     {
-      fps: 15,              // smoother scanning
+      fps: 15,
       qrbox: { width: 250, height: 250 }
     },
     onScanSuccess
   );
 
-}).catch(err => {
-  console.error(err);
-  alert("Camera permission blocked or not supported");
 });
 
-function onScanSuccess(decodedText) {
+async function onScanSuccess(decodedText) {
 
-  // prevent double scanning spam
-  if (scanCooldown) return;
-  if (decodedText === lastScan) return;
+  let now = Date.now();
+
+  // 🚫 BLOCK DUPLICATES (same barcode within 2 seconds)
+  if (decodedText === lastScan && now - lastScanTime < 2000) {
+    return;
+  }
 
   lastScan = decodedText;
-  scanCooldown = true;
+  lastScanTime = now;
+
+  // ⏸ PAUSE SCANNING (prevents spam + freezing)
+  try {
+    await scanner.pause(true);
+  } catch (e) {
+    console.log("pause error ignored");
+  }
 
   let barcode = decodedText;
 
@@ -53,21 +61,28 @@ function onScanSuccess(decodedText) {
     let price = prompt("Price:");
 
     if (!name || !price) {
-      scanCooldown = false;
+      resumeScanner();
       return;
     }
 
     product = { name, price };
-
     localStorage.setItem(barcode, JSON.stringify(product));
   }
 
   addToCart(product);
 
-  // cooldown so it feels like real scanner (important)
+  // ⏱ resume after short delay (smooth scanning)
   setTimeout(() => {
-    scanCooldown = false;
+    resumeScanner();
   }, 1200);
+}
+
+async function resumeScanner() {
+  try {
+    await scanner.resume();
+  } catch (e) {
+    console.log("resume error ignored");
+  }
 }
 
 function addToCart(product) {
